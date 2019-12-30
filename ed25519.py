@@ -62,7 +62,7 @@ def _hash(message):
     return hashlib.sha512(message).digest()
 
 
-def _inverse(x):  
+def _inverse(x):
     """Calculate inverse via Fermat's little theorem"""
     return pow(x, PRIME - 2, PRIME)
 

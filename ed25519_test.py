@@ -22,15 +22,12 @@ with open("ed25519_test.vectors", 'r') as file_handle:
         signature = ed25519.signature(message, secret_key, public_key)
         ed25519.check_valid(signature, message, public_key)
         forged_success = 0
+        if len(message) == 0: forged_message = b"x"
+        else: forged_message = message[:-1] + bytes([message[-1] ^ 0x01])
         try:
-            if len(message) == 0:
-                forged_message = "x"
-            else:
-                forged_message_len = len(message)
-                forged_message = ''.join([chr(ord(message[i]) + (i == forged_message_len - 1)) for i in range(forged_message_len)])
             ed25519.check_valid(signature, forged_message, public_key)
             forged_success = 1
-        except:
+        except ed25519.BadSignatureError:
             pass
         assert not forged_success
         assert x[0] == secret_key.hex() + public_key.hex()
@@ -41,7 +38,7 @@ with open("ed25519_test.vectors", 'r') as file_handle:
 print("Testing against libsodium")
 keyGen = nacl.signing.SigningKey(encoder=nacl.encoding.HexEncoder, seed=b"cafebabe" * 8)
 
-for index in range(5000):
+for index in range(50000):
     if index % 100 == 0: print("Index {}".format(index))
 
     # Generate a new random key pair, check for equivalence
@@ -74,7 +71,7 @@ for index in range(5000):
     except nacl.exceptions.BadSignatureError:
         pass  # this is good
 
-    # Confirm DUT fails too
+    # Confirm new code fails correctly too
     try:
         ed25519.check_valid(signed.signature, forged2, verify_key2)
         raise Exception("forged signature passes verification")
