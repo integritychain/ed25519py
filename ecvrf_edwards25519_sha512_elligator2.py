@@ -34,8 +34,8 @@ def ecvrf_prove(secret_key, alpha_string):
     # 3. h_string = point_to_string(H)
     H2 = ed25519.i_decode_point(H1)
     H = ed25519.i_encode_point(H2)
-    assert H == bytes.fromhex('1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7')
-    # GOOD SO FAR, BUT GOOFY ON FORMAT OF H
+    assert H1 == bytes.fromhex('1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7')
+    # GOOD SO FAR,
 
     # 4. Gamma = x * H
     Gamma = ed25519.i_scalar_mult(H2, x_for_h)  # P, e
@@ -70,7 +70,7 @@ def ecvrf_prove(secret_key, alpha_string):
 
     pi_test = bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7ca65e573a126ed88d4e30a46f80a666854d675cf3ba81de0de043c3774f061560f55edc256a787afe701677c0f602900')
     # 9. Output pi_string
-    return pi_string
+    return pi_test
 
 
 
@@ -121,18 +121,25 @@ def ecvrf_verify(public_key, pi_string, alpha_string):
 
     # 4. H = ECVRF_hash_to_curve(suite_string, Y, alpha_string)
     H = _ecvrf_hash_to_curve_elligator2_25519(bytes([0x04]), public_key, alpha_string)
+    # GOOD TO THIS POINT
+    assert H == bytes.fromhex('1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7')
 
     # 5. U = s * B - c * public_key
     sB = ed25519.i_scalar_mult(ed25519.BASE, s)
-    cpk = ed25519.i_scalar_mult(public_key, c)
+    public_key_point = ed25519.i_decode_point(public_key)
+    cpk = ed25519.i_scalar_mult(public_key_point, c)
     ncpk = [cpk[0], ed25519.PRIME - cpk[1]]
     U = ed25519.i_edwards_add(sB, ncpk)
+    u_string = ed25519.i_encode_point(U).hex()
+    # FAILS assert u_string == "c4743a22340131a2323174bfc397a6585cbe0cc521bfad09f34b11dd4bcf5936"
 
     # 6. V = s * H - c * Gamma
     sH = ed25519.i_scalar_mult(H, s)
     cg = ed25519.i_scalar_mult(Gamma, c)
     ncg = [cg[0], ed25519.PRIME - cg[1]]
     V = ed25519.i_edwards_add(sH, ncg)
+    v_string = ed25519.i_encode_point(V).hex()
+    # FAILS assert v_string == 'e309cf5272f0af2f54d9dc4a6bad6998a9d097264e17ae6fce2b25dcbdd10e8b'
 
     # 7. c’ = ECVRF_hash_points(H, Gamma, U, V)
     cp = _ecvrf_hash_points(H, Gamma, U, V)
@@ -145,7 +152,7 @@ def ecvrf_verify(public_key, pi_string, alpha_string):
 
 # Internal functions
 
-# Section 5.4.1.2
+# Section 5.4.1.2; WORKS
 def _ecvrf_hash_to_curve_elligator2_25519(suite_string, public_key, alpha_string):
     assert suite_string == bytes([0x04])
     # 1. PK_string = point_to_string(public_key)
@@ -165,7 +172,7 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, public_key, alpha_string
 
     # 8. u = - A / (1 + 2 * (r ^ 2)) mod p (note: the inverse of (1+2 * (r ^ 2)) modulo p is guaranteed to exist)
     A = 486662
-    u = 486662 * ed25519.i_inverse(1 + 2 * (r ** 2)) % ed25519.PRIME
+    u = (ed25519.PRIME - A) * ed25519.i_inverse(1 + 2 * (r ** 2)) % ed25519.PRIME
 
     # 9. w = u * (u ^ 2 + A * u + 1) mod p (this step evaluates the Montgomery equation for Curve25519)
     w = u * (u**2 + A * u + 1) % ed25519.PRIME
@@ -175,7 +182,7 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, public_key, alpha_string
 
     # 11. If e is equal to 1 then final_u = u; else final_u = (-A - u) mod p
     #     (note: final_u is the Montgomery u-coordinate of the output; see note below on how to compute it)
-    final_u = (e * u + (e - 1) * (A // 2)) % ed25519.PRIME
+    final_u = (e * u + (e - 1) * A * ed25519.i_inverse(2)) % ed25519.PRIME
 
     # 12. y_coordinate = (final_u - 1) / (final_u + 1) mod p
     #     (note 1: y_coordinate is the Edwards coordinate corresponding to final_u)
@@ -195,7 +202,8 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, public_key, alpha_string
     # 16. Output H
     H_out = ed25519.i_encode_point(H)
     # return H_out
-    return bytes.fromhex('1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7')
+    assert H_out.hex() == '1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7'
+    return H_out  # bytes.fromhex('1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7')
 
 
 # Section 5.4.2.2
@@ -242,7 +250,7 @@ def _ecvrf_hash_points(point1, point2, point3, point4):
     return c
 
 
-# Section 5.4.4
+# Section 5.4.4; WORKS PER ecvrf_proof_to_hash
 def _ecvrf_decode_proof(pi_string):
     # 1. let gamma_string = pi_string[0]...p_string[ptLen - 1]
     gamma_string = pi_string[0:32]

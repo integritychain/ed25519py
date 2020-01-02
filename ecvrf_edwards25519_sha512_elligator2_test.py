@@ -3,26 +3,31 @@ import nacl.signing, nacl.encoding
 import ecvrf_edwards25519_sha512_elligator2, ed25519
 
 
-keyGen = nacl.signing.SigningKey(encoder=nacl.encoding.HexEncoder, seed=b"cafebabe" * 8)
-secret_key = bytes(keyGen.generate())
-
-
-
-
 # A.4. ECVRF-EDWARDS25519-SHA512-Elligator2
 
-# These three example secret keys and messages are taken from Section 7.1 of [RFC8032].
-
-SK = bytes.fromhex('9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60')
-x = ecvrf_edwards25519_sha512_elligator2.ecvrf_prove(alpha_string=b'', secret_key=SK)
-
-pi_string = bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7ca65e573a126ed88d4e30a46f80a666854d675cf3ba81de0de043c3774f061560f55edc256a787afe701677c0f602900')
-res = ecvrf_edwards25519_sha512_elligator2.ecvrf_proof_to_hash(pi_string)
-print(res.hex())
-
+# Setup data for first testcase
+secret_key = bytes.fromhex('9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60')
 public_key = ed25519.get_public_key(secret_key)
-res2 = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(public_key=public_key, pi_string=res, alpha_string=b'')
-print(res2)
+assert public_key == bytes.fromhex('d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a')
+pi_string = bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7ca65e573a126ed88d4e30a46f80a666854d675cf3ba81de0de043c3774f061560f55edc256a787afe701677c0f602900')
+beta_string = bytes.fromhex('5b49b554d05c0cd5a5325376b3387de59d924fd1e13ded44648ab33c21349a603f25b84ec5ed887995b33da5e3bfcb87cd2f64521c4c62cf825cffabbe5d31cc')
+
+print("1. Testing prove", end='')
+res_pi = ecvrf_edwards25519_sha512_elligator2.ecvrf_prove(alpha_string=b'', secret_key=secret_key)
+assert res_pi == pi_string
+print("  ...pass\n\n")
+
+
+print("2. Testing proof-to-hash", end='')
+res_beta = ecvrf_edwards25519_sha512_elligator2.ecvrf_proof_to_hash(pi_string=pi_string)
+assert res_beta == beta_string
+print("  ...pass\n\n")
+
+print("3. Testing verify", end='')
+res_valid = ecvrf_edwards25519_sha512_elligator2.ecvrf_verify(public_key=public_key, pi_string=pi_string, alpha_string=b'')
+assert res_valid == "VALID"
+print("  ...pass\n\n")
+
 
 # PK = d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
 # alpha = (the empty string)
