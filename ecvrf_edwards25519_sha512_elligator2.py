@@ -42,10 +42,10 @@ def ecvrf_prove(secret_key, alpha_string):
 
     # 4. Gamma = x * H
     Gamma = ed25519.i_scalar_mult(H2, x_for_h)  # P, e
-    g_string = ed25519.i_encode_point(Gamma).hex()
-    g_int = int.from_bytes(g_string, 'big')
+    # g_string = ed25519.i_encode_point(Gamma).hex()
+    # g_int = int.from_bytes(g_string, 'big')
     ### ??? assert g_string == bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7')
-    # DOES NOT FULLY MAKE SENSE
+    # GAMMA IS GOOD!
 
     # 5. k = ECVRF_nonce_generation(SK, h_string)
     k = _ecvrf_nonce_generation_rfc8032(secret_key, H)
@@ -58,22 +58,27 @@ def ecvrf_prove(secret_key, alpha_string):
     kH = ed25519.i_scalar_mult(H2, k)
     kH_test = int.from_bytes(ed25519.i_encode_point(kH), 'big')
     assert kH_test == 0xe309cf5272f0af2f54d9dc4a6bad6998a9d097264e17ae6fce2b25dcbdd10e8b
-    c = _ecvrf_hash_points(H, Gamma, kB, kH)
-    # CANNOT TEST THIS C ----> but how can i get k*H but not x * H
+    c = _ecvrf_hash_points(H2, Gamma, kB, kH)
+    # C is GOOD!!
 
     # 7. s = (k + c * x) mod q
-    s = (k + c * x) % ed25519.ORDER
-    # CANNOT TEST THIS
+    s = (k + c * x_for_h) % ed25519.ORDER
 
     # 8. pi_string = point_to_string(Gamma) | | int_to_string(c, n) | | int_to_string(s, qLen)
-    # g_string = int.to_bytes(Gamma, 32, 'little')
-    c_string = int.to_bytes(c, 16, 'little') ## Right length?
+    g_string = ed25519.i_encode_point(Gamma)
+    c_string = int.to_bytes(c, 16, 'little')
     s_string = int.to_bytes(s, 32, 'little')
-    pi_string = g_string.hex() + "--" + c_string.hex() + "--" + s_string.hex()
+    pi_string = g_string + c_string + s_string
+
+    ### test pi string
+    D = _ecvrf_decode_proof(pi_string)
+    assert g_string.hex() == 'b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7'
+    assert c_string.hex() == 'ca65e573a126ed88d4e30a46f80a6668'
+    assert s_string.hex() == '54d675cf3ba81de0de043c3774f061560f55edc256a787afe701677c0f602900'
 
     pi_test = bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7ca65e573a126ed88d4e30a46f80a666854d675cf3ba81de0de043c3774f061560f55edc256a787afe701677c0f602900')
     # 9. Output pi_string
-    return pi_test
+    return pi_string
 
 
 
@@ -133,19 +138,25 @@ def ecvrf_verify(public_key, pi_string, alpha_string):
     cpk = ed25519.i_scalar_mult(public_key_point, c)
     ncpk = [cpk[0], ed25519.PRIME - cpk[1]]
     U = ed25519.i_edwards_add(sB, ncpk)
-    u_string = ed25519.i_encode_point(U).hex()
-    # FAILS assert u_string == "c4743a22340131a2323174bfc397a6585cbe0cc521bfad09f34b11dd4bcf5936"
+    Uneg = [U[0], ed25519.PRIME - U[1]]
+
+    u_string = ed25519.i_encode_point(Uneg).hex()
+    # assert u_string == "c4743a22340131a2323174bfc397a6585cbe0cc521bfad09f34b11dd4bcf5936"  ##### <-------- VERY CLOSE (LSB BORKED)
+
 
     # 6. V = s * H - c * Gamma
-    sH = ed25519.i_scalar_mult(H, s)
+    sH = ed25519.i_scalar_mult(ed25519.i_decode_point(H), s)
     cg = ed25519.i_scalar_mult(Gamma, c)
     ncg = [cg[0], ed25519.PRIME - cg[1]]
-    V = ed25519.i_edwards_add(sH, ncg)
-    v_string = ed25519.i_encode_point(V).hex()
-    # FAILS assert v_string == 'e309cf5272f0af2f54d9dc4a6bad6998a9d097264e17ae6fce2b25dcbdd10e8b'
+    V = ed25519.i_edwards_add(ncg, sH)
+    Vneg = [V[0], ed25519.PRIME - V[1]]
+    v_string = ed25519.i_encode_point(Vneg).hex()
+    assert v_string == 'e309cf5272f0af2f54d9dc4a6bad6998a9d097264e17ae6fce2b25dcbdd10e8b'   ###### <--------- VERY CLOSE (LSB BORKED)
+    v_test = int.from_bytes(ed25519.i_encode_point(Vneg), 'little')
+    # assert v_test == 0xe309cf5272f0af2f54d9dc4a6bad6998a9d097264e17ae6fce2b25dcbdd10e8b
 
     # 7. c’ = ECVRF_hash_points(H, Gamma, U, V)
-    cp = _ecvrf_hash_points(H, Gamma, U, V)
+    cp = _ecvrf_hash_points(ed25519.i_encode_point(H), Gamma, Uneg, Vneg)
 
     # 8. If c and c’ are equal, output("VALID", ECVRF_proof_to_hash(pi_string)); else output "INVALID"
     # return "VALID", ECVRF_proof_to_hash(pi_string)); else output "INVALID"
