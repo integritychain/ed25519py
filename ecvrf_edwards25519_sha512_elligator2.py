@@ -22,14 +22,17 @@ def ecvrf_prove(secret_key, alpha_string):
     tmp[31] = int((tmp[31] & 0x7f) | 0x40)
     tmp[0] = int(tmp[0] & 0xf8)
     x = int.from_bytes(tmp, 'big')
-    x_for_h = int.from_bytes(secret_key, 'big')
+    x_for_h = int.from_bytes(tmp, 'little')  # ed25519.i_decode_point(tmp)
     public_key = ed25519.get_public_key(secret_key)
     assert public_key == bytes.fromhex('d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a')
     assert x == 0x307c83864f2833cb427a2ef1c00a013cfdff2768d980c0a3a520f006904de94f
     # <----- GOOD SO FAR
 
     # 2. H = ECVRF_hash_to_curve(suite_string, Y, alpha_string)
-    H1 = _ecvrf_hash_to_curve_elligator2_25519(bytes([0x04]), public_key, alpha_string)
+    H1 = bytearray(_ecvrf_hash_to_curve_elligator2_25519(bytes([0x04]), public_key, alpha_string))
+    # H1[31] = int((H1[31] & 0x7f) | 0x40)
+    # H1[0] = int(H1[0] & 0xf8)
+
 
     # 3. h_string = point_to_string(H)
     H2 = ed25519.i_decode_point(H1)
@@ -39,7 +42,7 @@ def ecvrf_prove(secret_key, alpha_string):
 
     # 4. Gamma = x * H
     Gamma = ed25519.i_scalar_mult(H2, x_for_h)  # P, e
-    g_string = ed25519.i_encode_point(Gamma)
+    g_string = ed25519.i_encode_point(Gamma).hex()
     g_int = int.from_bytes(g_string, 'big')
     ### ??? assert g_string == bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7')
     # DOES NOT FULLY MAKE SENSE
@@ -152,7 +155,7 @@ def ecvrf_verify(public_key, pi_string, alpha_string):
 
 # Internal functions
 
-# Section 5.4.1.2; WORKS
+# Section 5.4.1.2; WORKS PER prove and verify
 def _ecvrf_hash_to_curve_elligator2_25519(suite_string, public_key, alpha_string):
     assert suite_string == bytes([0x04])
     # 1. PK_string = point_to_string(public_key)
@@ -206,7 +209,7 @@ def _ecvrf_hash_to_curve_elligator2_25519(suite_string, public_key, alpha_string
     return H_out  # bytes.fromhex('1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7')
 
 
-# Section 5.4.2.2
+# Section 5.4.2.2; WORKS PER prove
 def _ecvrf_nonce_generation_rfc8032(secret_key, h_string):
     # 1. hashed_sk_string = Hash(secret_key)
     hashed_sk_string = ed25519.i_hash(secret_key)
@@ -225,7 +228,7 @@ def _ecvrf_nonce_generation_rfc8032(secret_key, h_string):
     return k
 
 
-# Section 5.4.3
+# Section 5.4.3; CANNOT TEST YET AS PROVE/VERIFY HAVEN'T MADE IT FAR ENOUGH
 def _ecvrf_hash_points(point1, point2, point3, point4):
     # 1. two_string = 0x02 = int_to_string(2, 1), a single octet with value 2
     two_string = 0x02

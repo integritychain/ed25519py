@@ -12,6 +12,14 @@ assert public_key == bytes.fromhex('d75a980182b10ab7d54bfed3c964073a0ee172f3daa6
 pi_string = bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7ca65e573a126ed88d4e30a46f80a666854d675cf3ba81de0de043c3774f061560f55edc256a787afe701677c0f602900')
 beta_string = bytes.fromhex('5b49b554d05c0cd5a5325376b3387de59d924fd1e13ded44648ab33c21349a603f25b84ec5ed887995b33da5e3bfcb87cd2f64521c4c62cf825cffabbe5d31cc')
 
+# print("Testing mult...  ", end='')
+# H = ed25519.i_decode_point(bytes.fromhex('1c5672d919cc0a800970cd7e05cb36ed27ed354c33519948e5a9eaf89aee12b7'))
+# x = secret_key
+# Gamma = ed25519.i_scalar_mult(H, x)
+# assert ed25519.i_encode_point(Gamma) == bytes.fromhex('b6b4699f87d56126c9117a7da55bd0085246f4c56dbc95d20172612e9d38e8d7')
+# print("  ...pass\n\n")
+
+
 print("1. Testing prove", end='')
 res_pi = ecvrf_edwards25519_sha512_elligator2.ecvrf_prove(alpha_string=b'', secret_key=secret_key)
 assert res_pi == pi_string
