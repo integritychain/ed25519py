@@ -138,10 +138,13 @@ def ecvrf_verify(public_key, pi_string, alpha_string):
     cpk = ed25519.i_scalar_mult(public_key_point, c)
     ncpk = [cpk[0], ed25519.PRIME - cpk[1]]
     U = ed25519.i_edwards_add(sB, ncpk)
-    Uneg = [U[0], ed25519.PRIME - U[1]]
-
+    Uneg = [ed25519.PRIME - U[0], ed25519.PRIME - U[1]]
+    # amask = (1 << 256) - 8
+    #Uneg[1] = Uneg[1] & amask
+    # tmp[31] = int((tmp[31] & 0x7f) | 0x40)
+    # tmp[0] = int(tmp[0] & 0xf8)
     u_string = ed25519.i_encode_point(Uneg).hex()
-    # assert u_string == "c4743a22340131a2323174bfc397a6585cbe0cc521bfad09f34b11dd4bcf5936"  ##### <-------- VERY CLOSE (LSB BORKED)
+    assert u_string == "c4743a22340131a2323174bfc397a6585cbe0cc521bfad09f34b11dd4bcf5936"  ##### <-------- VERY CLOSE (LSB BORKED)
 
 
     # 6. V = s * H - c * Gamma
@@ -149,14 +152,15 @@ def ecvrf_verify(public_key, pi_string, alpha_string):
     cg = ed25519.i_scalar_mult(Gamma, c)
     ncg = [cg[0], ed25519.PRIME - cg[1]]
     V = ed25519.i_edwards_add(ncg, sH)
-    Vneg = [V[0], ed25519.PRIME - V[1]]
+    Vneg = [ed25519.PRIME - V[0], ed25519.PRIME - V[1]]
     v_string = ed25519.i_encode_point(Vneg).hex()
     assert v_string == 'e309cf5272f0af2f54d9dc4a6bad6998a9d097264e17ae6fce2b25dcbdd10e8b'   ###### <--------- VERY CLOSE (LSB BORKED)
     v_test = int.from_bytes(ed25519.i_encode_point(Vneg), 'little')
     # assert v_test == 0xe309cf5272f0af2f54d9dc4a6bad6998a9d097264e17ae6fce2b25dcbdd10e8b
 
+    H22 = ed25519.i_decode_point(H)
     # 7. c’ = ECVRF_hash_points(H, Gamma, U, V)
-    cp = _ecvrf_hash_points(ed25519.i_encode_point(H), Gamma, Uneg, Vneg)
+    cp = _ecvrf_hash_points(H22, Gamma, Uneg, Vneg)
 
     # 8. If c and c’ are equal, output("VALID", ECVRF_proof_to_hash(pi_string)); else output "INVALID"
     # return "VALID", ECVRF_proof_to_hash(pi_string)); else output "INVALID"
